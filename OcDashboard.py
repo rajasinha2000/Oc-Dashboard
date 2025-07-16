@@ -7,6 +7,15 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
 
+from datetime import datetime, time
+import pytz
+
+def is_market_open():
+    india = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(india).time()
+    return time(9, 15) <= now <= time(15, 30)
+
+
 # ========== CONFIG ==========
 st.set_page_config("📈 Option Chain Dashboard", layout="wide")
 st_autorefresh(interval=900000, limit=None, key="refresh")
@@ -152,10 +161,13 @@ def analyze_option_chain(df):
             - 🛑 Stoploss: `{stop}`
             - 🔍 Trend: `{trade['Trend']}` | Breakout: `{trade['Breakout']}` | OI: `{trade['OI_Shift']}`
             """)
-            send_email_alert(
-                f"Option Chain Alert: {side} BUY {strike}",
-                f"Trade Signal: {side} Buy @ {entry}\nTarget: {target}\nStop: {stop}\nCMP: {cmp}"
-            )
+            if is_market_open():
+                send_email_alert(
+                    f"Option Chain Alert: {side} BUY {strike}",
+                    f"Trade Signal: {side} Buy @ {entry}\nTarget: {target}\nStop: {stop}\nCMP: {cmp}"
+                )
+            else:
+                st.info("⏰ Market closed. Email alert skipped.")
         else:
             st.info("⚠️ Trade is valid but not strong enough to send an email.")
     else:
