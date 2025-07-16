@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import requests
@@ -6,15 +5,14 @@ from streamlit_autorefresh import st_autorefresh
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
-
 from datetime import datetime, time
 import pytz
 
+# ========== MARKET TIME CHECK ==========
 def is_market_open():
     india = pytz.timezone("Asia/Kolkata")
     now = datetime.now(india).time()
     return time(9, 15) <= now <= time(15, 30)
-
 
 # ========== CONFIG ==========
 st.set_page_config("📈 Option Chain Dashboard", layout="wide")
@@ -150,26 +148,24 @@ def analyze_option_chain(df):
         stop = strike - 40 if side == "CE" else strike + 40
         target = strike + 80 if side == "CE" else strike - 80
 
-        if (
-            (side == "CE" and trade["Trend"] == "🔼 Uptrend" and trade["Breakout"] == "🔥 High" and trade["OI_Shift"] == "🔼 Support Up") or
-            (side == "PE" and trade["Trend"] == "🔽 Downtrend" and trade["Breakout"] == "🔥 High" and trade["OI_Shift"] == "🔽 Resistance Down")
-        ):
-            st.success(f"""
-            ### 🎯 Best Trade Now:
-            - 📈 **{side} BUY @ {entry}**
-            - 🎯 Target: `{target}`
-            - 🛑 Stoploss: `{stop}`
-            - 🔍 Trend: `{trade['Trend']}` | Breakout: `{trade['Breakout']}` | OI: `{trade['OI_Shift']}`
-            """)
-            if is_market_open():
-                send_email_alert(
-                    f"Option Chain Alert: {side} BUY {strike}",
-                    f"Trade Signal: {side} Buy @ {entry}\nTarget: {target}\nStop: {stop}\nCMP: {cmp}"
-                )
-            else:
-                st.info("⏰ Market closed. Email alert skipped.")
+        st.success(f"""
+        ### 🎯 Best Trade Now:
+        - 📈 **{side} BUY @ {entry}**
+        - 🎯 Target: `{target}`
+        - 🛑 Stoploss: `{stop}`
+        - 🔍 Trend: `{trade['Trend']}` | Breakout: `{trade['Breakout']}` | OI: `{trade['OI_Shift']}`
+        """)
+
+        if is_market_open():
+            send_email_alert(
+                f"Option Chain Alert: {side} BUY {strike}",
+                f"""Trade Signal: {side} Buy @ {entry}
+Target: {target}
+Stop: {stop}
+CMP: {cmp}"""
+            )
         else:
-            st.info("⚠️ Trade is valid but not strong enough to send an email.")
+            st.info("⏰ Market closed. Email alert skipped.")
     else:
         st.info("⚠️ No strong trade opportunity found near CMP.")
 
