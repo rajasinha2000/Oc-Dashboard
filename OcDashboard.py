@@ -133,6 +133,37 @@ def analyze_option_chain(df):
         best_trade = df_near[df_near["✅ Final Call"] == "✅ Yes"].copy()
        ^
 IndentationError: unexpected indent
+    best_trade = df_near[df_near["✅ Final Call"] == "✅ Yes"].copy()
+    if not best_trade.empty:
+        best_trade["Score"] = best_trade["Breakout"].map({"🔥 High": 3, "🌥️ Medium": 2, "❄️ Low": 1})
+        best_trade = best_trade.sort_values(["Score", "PCR"], ascending=False).head(1)
+        trade = best_trade.iloc[0]
+        strike = trade["Strike"]
+        side = "CE" if "CE" in trade["Trade"] else "PE"
+        entry = strike
+        stop = strike - 40 if side == "CE" else strike + 40
+        target = strike + 80 if side == "CE" else strike - 80
+
+        # ✅ Only send email if it's a strong setup
+        if (
+            (side == "CE" and trade["Trend"] == "🔼 Uptrend" and trade["Breakout"] == "🔥 High" and trade["OI_Shift"] == "🔼 Support Up") or
+            (side == "PE" and trade["Trend"] == "🔽 Downtrend" and trade["Breakout"] == "🔥 High" and trade["OI_Shift"] == "🔽 Resistance Down")
+        ):
+            st.success(f"""
+### 🎯 Best Trade Now:
+- 📈 **{side} BUY @ {entry}**
+- 🎯 Target: `{target}`
+- 🛑 Stoploss: `{stop}`
+- 🔍 Trend: `{trade['Trend']}` | Breakout: `{trade['Breakout']}` | OI: `{trade['OI_Shift']}`
+            """)
+            send_email_alert(
+                f"Option Chain Alert: {side} BUY {strike}",
+                f"Trade Signal: {side} Buy @ {entry}\nTarget: {target}\nStop: {stop}\nCMP: {cmp}"
+            )
+        else:
+            st.info("⚠️ Trade is valid but not strong enough to send an email.")
+    else:
+        st.info("⚠️ No strong trade opportunity found near CMP.")
 
 
 # ========== MAIN APP ==========
