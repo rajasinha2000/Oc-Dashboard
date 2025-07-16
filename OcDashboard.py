@@ -19,8 +19,13 @@ st.set_page_config("📈 Option Chain Dashboard", layout="wide")
 st_autorefresh(interval=900000, limit=None, key="refresh")
 st.title("📘 Option Chain Dashboard (NSE Live)")
 
+# ========== TOGGLE EMAIL ALERT ==========
+send_alert = st.toggle("📧 Enable Email Alerts", value=True)
+
 # ========== EMAIL ALERT FUNCTION ==========
 def send_email_alert(subject, message, to_email="mdrinfotech79@gmail.com"):
+    if not is_market_open():
+        return  # Extra safety: skip if market closed
     from_email = "rajasinha2000@gmail.com"
     from_password = "hefy otrq yfji ictv"
     try:
@@ -156,7 +161,7 @@ def analyze_option_chain(df):
         - 🔍 Trend: `{trade['Trend']}` | Breakout: `{trade['Breakout']}` | OI: `{trade['OI_Shift']}`
         """)
 
-        if is_market_open():
+        if is_market_open() and send_alert:
             send_email_alert(
                 f"Option Chain Alert: {side} BUY {strike}",
                 f"""Trade Signal: {side} Buy @ {entry}
@@ -165,7 +170,7 @@ Stop: {stop}
 CMP: {cmp}"""
             )
         else:
-            st.info("⏰ Market closed. Email alert skipped.")
+            st.info("⏰ Market closed or alerts disabled. Email not sent.")
     else:
         st.info("⚠️ No strong trade opportunity found near CMP.")
 
