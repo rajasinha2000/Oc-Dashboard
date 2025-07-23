@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import requests
@@ -5,27 +6,29 @@ from streamlit_autorefresh import st_autorefresh
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
-from datetime import datetime, time
-import pytz
-
-# ========== MARKET TIME CHECK ==========
-def is_market_open():
-    india = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(india).time()
-    return time(9, 15) <= now <= time(15, 30)
 
 # ========== CONFIG ==========
 st.set_page_config("📈 Option Chain Dashboard", layout="wide")
 st_autorefresh(interval=900000, limit=None, key="refresh")
 st.title("📘 Option Chain Dashboard (NSE Live)")
+# ========== TELEGRAM CONFIG ========== #
+TELEGRAM_TOKEN = "7735892458:AAELFRclang2MgJwO2Rd9RRwNmoll1LzlFg"
+TELEGRAM_CHAT_ID = "5073531512"
 
-# ========== TOGGLE EMAIL ALERT ==========
-send_alert = st.toggle("📧 Enable Email Alerts", value=True)
+def send_telegram_alert(message):
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "text": message,
+            "parse_mode": "Markdown"
+        }
+        requests.post(url, data=payload)
+    except Exception as e:
+        st.warning(f"📟 Telegram failed: {e}")
 
 # ========== EMAIL ALERT FUNCTION ==========
 def send_email_alert(subject, message, to_email="mdrinfotech79@gmail.com"):
-    if not is_market_open():
-        return  # Extra safety: skip if market closed
     from_email = "rajasinha2000@gmail.com"
     from_password = "hefy otrq yfji ictv"
     try:
@@ -117,7 +120,7 @@ def analyze_option_chain(df):
     df["Trade"] = df.apply(trade_suggestion, axis=1)
     df["✅ Final Call"] = df["Trade"].apply(lambda x: "✅ Yes" if "Buy" in x else "❌ No")
 
-    df_near = df[(df["Strike"] >= cmp - 300) & (df["Strike"] <= cmp + 300)].copy()
+    df_near = df[(df["Strike"] >= cmp - 200) & (df["Strike"] <= cmp + 200)].copy()
 
     def highlight_atm(row):
         color = 'background-color: blue' if abs(row["Strike"] - atm_strike) < 1e-2 else ''
@@ -153,24 +156,30 @@ def analyze_option_chain(df):
         stop = strike - 40 if side == "CE" else strike + 40
         target = strike + 80 if side == "CE" else strike - 80
 
-        st.success(f"""
-        ### 🎯 Best Trade Now:
-        - 📈 **{side} BUY @ {entry}**
-        - 🎯 Target: `{target}`
-        - 🛑 Stoploss: `{stop}`
-        - 🔍 Trend: `{trade['Trend']}` | Breakout: `{trade['Breakout']}` | OI: `{trade['OI_Shift']}`
-        """)
+        if (
+            (side == "CE" and trade["Trend"] == "🔼 Uptrend" and trade["Breakout"] == "🔥 High" and trade["OI_Shift"] == "🔼 Support Up") or
+            (side == "PE" and trade["Trend"] == "🔽 Downtrend" and trade["Breakout"] == "🔥 High" and trade["OI_Shift"] == "🔽 Resistance Down")
+        ):
+            st.success(f"""
+            ### 🎯 Best Trade Now:
+            - 📈 **{side} BUY @ {entry}**
+            - 🎯 Target: `{target}`
+            - 🛑 Stoploss: `{stop}`
+            - 🔍 Trend: `{trade['Trend']}` | Breakout: `{trade['Breakout']}` | OI: `{trade['OI_Shift']}`
+            """)
+            msg = f"""📢 *Option Chain Alert*:
+            {side} *BUY* @ {entry}
+            🎯 Target: {target}
+            🛑 Stoploss: {stop}
+             📍 CMP: {cmp}
+             📊 Trend: {trade['Trend']}, Breakout: {trade['Breakout']}, OI: {trade['OI_Shift']}"""
 
-        if is_market_open() and send_alert:
-            send_email_alert(
-                f"Option Chain Alert: {side} BUY {strike}",
-                f"""Trade Signal: {side} Buy @ {entry}
-Target: {target}
-Stop: {stop}
-CMP: {cmp}"""
-            )
+  ##==      send_email_alert(f"Option Chain Alert: {side} BUY {strike}", msg)
+            send_telegram_alert(msg)
+
+
         else:
-            st.info("⏰ Market closed or alerts disabled. Email not sent.")
+            st.info("⚠️ Trade is valid but not strong enough to send an email.")
     else:
         st.info("⚠️ No strong trade opportunity found near CMP.")
 
